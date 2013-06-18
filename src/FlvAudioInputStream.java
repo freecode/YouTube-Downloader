@@ -2,9 +2,9 @@ import java.io.IOException;
 import java.io.InputStream;
 
 public class FlvAudioInputStream extends InputStream {
+	private InputStream input;
 	private boolean headRead = false;
 	private boolean endOfStream = false;
-	private InputStream input;
 	private long offset = 0L;
 	private int available = 0;//audio bytes
 
@@ -28,7 +28,7 @@ public class FlvAudioInputStream extends InputStream {
 		if (endOfStream)
 			return 0L;
 		if (!headRead)
-			inputReadHead();
+			readHead();
 		long l1 = 0L;
 		while (l1 < paramLong && !endOfStream) {
 			if (available <= 0) available = readTag();
@@ -54,7 +54,7 @@ public class FlvAudioInputStream extends InputStream {
 		return readAudio(buffer, offset, len);
 	}
 
-	private void inputReadHead() throws IOException {
+	private void readHead() throws IOException {
 		long l1 = readUInt32();
 		if (l1 != 1179407873L)
 			throw new IOException("Not an FLV file.");
@@ -68,7 +68,7 @@ public class FlvAudioInputStream extends InputStream {
 		if (endOfStream)
 			return -1;
 		if (!headRead)
-			inputReadHead();
+			readHead();
 		int i = 0;
 		while (i < len && !endOfStream) {
 			if (available <= 0) {
