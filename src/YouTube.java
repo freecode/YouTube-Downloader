@@ -8,7 +8,7 @@ import java.util.*;
  */
 
 public class YouTube {
-    /*
+	/*
     Does not always download, retrying after a couple mins or 30 seconds sometimes helps
      */
 
@@ -59,10 +59,16 @@ public class YouTube {
 	}
 
 	public static void main(String[] args) {
-		downloadUrl("http://m.youtube.com/watch?v=93LJVlxzE_Q");
+		downloadUrl("http://m.youtube.com/watch?v=dvmlXsBzxb8");
 	}
 
-	private static int target_quality = 5;//35 does not work (Yet), haven't tested 34,
+	public static String STORAGE = "C:/Users/l3eta/Desktop/";
+	/**
+	 * Tested: 35, 5
+	 * Working: 5
+	 *
+	 */
+	private static int TARGET_QUALITY = 5;
 	private static Progress progress = new Progress() { //debugging
 		public void update(int current) {
 			System.out.println(current + "/" + total);
@@ -79,21 +85,16 @@ public class YouTube {
 		if (x < 0)
 			x = url.length();
 		download(url.substring(i, x));
-
 	}
 
 	public static void download(String id) {
 		String[] flvUrls = getFLVFormatUrls(getURLS(id));
-
 		if (flvUrls != null) {
 			boolean downloaded = false;
 			for (String flv : flvUrls) {
 				int tag = getTag(flv);
-				if (tag == target_quality) {
-					downloaded = downloadVideo("", flv);
-				}
-				if (!downloaded) {
-					downloaded = downloadVideo("", flv);
+				if (tag == TARGET_QUALITY) {//Download only target to avoid issues
+					downloaded = downloadVideo(flv);
 				}
 				if (downloaded)
 					break;
@@ -107,6 +108,8 @@ public class YouTube {
 	}
 
 	private static String[] getFLVFormatUrls(String[] urls) {
+		if(urls == null)
+			return null;
 		ArrayList<String> u = new ArrayList<String>();
 		for (String url : urls) {
 			int tag = getTag(url);
@@ -127,13 +130,24 @@ public class YouTube {
 		return u.toArray(new String[u.size()]);
 	}
 
-	private static String[] getURLS(String id) {
+	public static InputStream getVideoInfo(String id) {
 		try {
 			HttpURLConnection connection = con("http://www.youtube.com/get_video_info?video_id=" + id + "&asv=3&el=detailpage&hl=en_US");
 			connection.setRequestMethod("GET");
-			InputStream is = connection.getInputStream();
-			BufferedReader reader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+			return connection.getInputStream();
+		} catch(Exception ex) {
+			ex.printStackTrace();
+		}
+		return null;
+	}
 
+	private static String[] getURLS(String id) {
+		try {
+			InputStream is = getVideoInfo(id);
+			if(is == null) {
+				return null;
+			}
+			BufferedReader reader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
 			LinkedList<String> urls = new LinkedList<String>();
 			String title = null;
 			for (String l; (l = reader.readLine()) != null; ) {
@@ -168,7 +182,7 @@ public class YouTube {
 		return null;
 	}
 
-	private static boolean isValid(String url) {
+	private static boolean isValid(String url) {//kinda pointless lol
 		return url.contains("signature=") && url.contains("factor=");
 	}
 
@@ -181,7 +195,6 @@ public class YouTube {
 
 	private static String getCorrectURL(String input) {
 		StringBuilder builder = new StringBuilder(input.substring(0, input.indexOf('?') + 1));
-
 		String[] params = input.substring(input.indexOf('?') + 1).split("&");
 		LinkedList<String> keys = new LinkedList<String>();
 		boolean first = true;
@@ -221,16 +234,15 @@ public class YouTube {
 		return text.replace(text.substring(l, end.equals("_end_") ? text.length() : text.indexOf(end, l)), "");
 	}
 
-	public static boolean downloadVideo(String title, String url) {
+	public static boolean downloadVideo(String url) {
 		System.out.println("Trying: " + url);
 		FlvAudioInputStream input = null;
 		FileOutputStream output = null;
 		try {
-			String file = getSaveFilePath(title);
+			String file = getSaveFilePath(url.substring(url.lastIndexOf('&') + 7));
 			if (file != null) {
 				output = new FileOutputStream(file);
-				URL u = new URL(url);
-				HttpURLConnection con = (HttpURLConnection) u.openConnection();
+				HttpURLConnection con = con(url);
 				con.connect();
 				if (progress != null)
 					progress.setTotal(con.getContentLength());
@@ -246,6 +258,7 @@ public class YouTube {
 			}
 		} catch (Exception ex) {
 			handleException(ex);
+			return false;
 		} finally {
 			try {
 				if (input != null)
@@ -259,12 +272,12 @@ public class YouTube {
 		return false;
 	}
 
-	public static void handleException(Exception ex) {
+	private static void handleException(Exception ex) {
 		System.out.println(ex);
 	}
 
-	public static String getSaveFilePath(String f) {
-		return "C:/Users/l3eta/Desktop/file.mp3";
+	public static String getSaveFilePath(String name) {//TODO remove invalid chars from file name
+		return STORAGE + "/" + decode(name).replace("?", "") + ".mp3";
 	}
 
 	public static String decode(String s) {
@@ -283,8 +296,12 @@ public class YouTube {
 			this.total = total;
 		}
 
-		public int getTotalMB() {
-			return total / 1024 / 1024;
+		public double getSizeInMB(int len) {
+			return len / 1024.0 / 1024.0;
+		}
+
+		public double getTotalMB() {
+			return getSizeInMB(total);
 		}
 
 		public abstract void update(int current);
